@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PICK UP ORDER SHEET</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+    
+    <style>
+        * { box-sizing: border-box; }
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 0; 
+            padding: 10px; 
+            background: linear-gradient(135deg, #f5f7fa, #c3cfe2); 
+        }
+        .container {
+            max-width: 1350px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+            overflow: hidden;
+        }
+        .header-bar {
+            background: linear-gradient(90deg, #1e3a8a, #3b82f6);
+            color: white;
+            padding: 18px;
+            text-align: center;
+            font-size: 24px;
+            font-weight: bold;
+        }
+        .content { padding: 20px; }
+
+        .header { 
+            display: grid; 
+            grid-template-columns: 140px 1fr; 
+            gap: 12px 20px; 
+            margin-bottom: 20px; 
+            background: #f8fafc; 
+            padding: 15px; 
+            border-radius: 10px; 
+        }
+        .generator {
+            background: #eff6ff;
+            border: 2px solid #3b82f6;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        .generator-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 12px;
+        }
+
+        .table-wrapper { overflow-x: auto; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 800px;
+            display: none;
+        }
+        table.show { display: table; }
+        th { background: linear-gradient(90deg, #1e3a8a, #3b82f6); color: white; padding: 12px 8px; }
+        td { border: 1px solid #e2e8f0; padding: 8px; text-align: center; }
+        .total-row { background: #fef3c7; font-weight: bold; }
+
+        .actions { text-align: center; margin: 25px 0; }
+        .btn {
+            padding: 12px 24px;
+            margin: 8px;
+            font-size: 15px;
+            font-weight: bold;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+        .btn-add { background: #2563eb; color: white; }
+        .btn-excel { background: #16a34a; color: white; }
+        .btn-pdf { background: #dc2626; color: white; }
+        .btn-clear { background: #b91c1c; color: white; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header-bar">PICK UP ORDER SHEET</div>
+        <div class="content">
+
+            <div class="header">
+                <label>NAMA</label><input type="text" id="nama" value="Taufiq H.">
+                <label>AREA</label><input type="text" id="area" value="MAKASSAR">
+                <label>NO.HP</label><input type="text" id="nohp" value="0852 4122 7052">
+                <label>DATE/HARI</label><input type="text" id="date" value="30 / 06 / 26 | Selasa">
+                <label>PLAT NO.</label><input type="text" id="plat" value="DC 28 08 FN">
+            </div>
+
+            <div class="generator">
+                <h3>🚀 Quick Generator</h3>
+                <div class="generator-grid">
+                    <input type="text" id="genShipper" placeholder="Shipper">
+                    <input type="number" id="genAwb" placeholder="AWB">
+                    <input type="number" id="genColly" placeholder="COLLY">
+                    <input type="number" id="genWeight" placeholder="WEIGHT">
+                    <input type="text" id="genRemarks" placeholder="Remarks">
+                    <input type="text" id="genSignature" placeholder="Signature">
+                </div>
+                <div style="text-align:center; margin-top:15px;">
+                    <button class="btn btn-add" onclick="generateRow()">➕ Tambah Baris</button>
+                    <button class="btn btn-add" onclick="generateMultiple(5)">Tambah 5 Baris</button>
+                </div>
+            </div>
+
+            <button onclick="toggleTable()" style="width:100%; padding:14px; background:#64748b; color:white; border:none; border-radius:8px; margin-bottom:15px; font-weight:bold;">
+                👁️ Tampilkan / Sembunyikan Tabel
+            </button>
+
+            <div class="table-wrapper">
+                <table id="pickupTable">
+                    <thead>
+                        <tr>
+                            <th rowspan="2">NO</th>
+                            <th rowspan="2">SHIPPER</th>
+                            <th colspan="3">NUMBER OF PIECES</th>
+                            <th rowspan="2">REMARKS</th>
+                            <th rowspan="2">SIGNATURE</th>
+                        </tr>
+                        <tr>
+                            <th>AWB</th>
+                            <th>COLLY</th>
+                            <th>WEIGHT</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody"></tbody>
+                    <tfoot>
+                        <tr class="total-row">
+                            <td colspan="2" style="text-align:right;">SUB TOTAL</td>
+                            <td id="totalAwb">0</td>
+                            <td id="totalColly">0</td>
+                            <td id="totalWeight">0</td>
+                            <td colspan="2"></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+
+            <div class="actions">
+                <button class="btn btn-excel" onclick="exportToExcel()">📊 Export Excel</button>
+                <button class="btn btn-pdf" onclick="exportToPDF()">📄 Export PDF (Portrait)</button>
+                <button class="btn btn-clear" onclick="clearTable()">🗑️ Reset Semua</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let rowCounter = 0;
+        let tableVisible = false;
+
+        function toggleTable() {
+            tableVisible = !tableVisible;
+            document.getElementById('pickupTable').classList.toggle('show', tableVisible);
+        }
+
+        function addRow(data = {}) {
+            rowCounter++;
+            const tbody = document.getElementById('tableBody');
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${rowCounter}</td>
+                <td><input type="text" value="${data.shipper || ''}" oninput="calculateTotal()"></td>
+                <td><input type="number" value="${data.awb || ''}" oninput="calculateTotal()"></td>
+                <td><input type="number" value="${data.colly || ''}" oninput="calculateTotal()"></td>
+                <td><input type="number" value="${data.weight || ''}" oninput="calculateTotal()"></td>
+                <td><input type="text" value="${data.remarks || ''}"></td>
+                <td><textarea rows="2" oninput="calculateTotal()">${data.signature || ''}</textarea></td>
+            `;
+            tbody.appendChild(row);
+            calculateTotal();
+            if (!tableVisible) toggleTable();
+        }
+
+        function generateRow() {
+            addRow({
+                shipper: document.getElementById('genShipper').value,
+                awb: document.getElementById('genAwb').value,
+                colly: document.getElementById('genColly').value,
+                weight: document.getElementById('genWeight').value,
+                remarks: document.getElementById('genRemarks').value,
+                signature: document.getElementById('genSignature').value
+            });
+            document.querySelectorAll('.generator input').forEach(i => i.value = '');
+        }
+
+        function generateMultiple(n) {
+            for (let i = 0; i < n; i++) addRow({});
+        }
+
+        function calculateTotal() {
+            let awb = 0, colly = 0, weight = 0;
+            document.querySelectorAll('#tableBody tr').forEach(r => {
+                const n = r.querySelectorAll('input[type="number"]');
+                awb += parseFloat(n[0]?.value) || 0;
+                colly += parseFloat(n[1]?.value) || 0;
+                weight += parseFloat(n[2]?.value) || 0;
+            });
+            document.getElementById('totalAwb').textContent = awb;
+            document.getElementById('totalColly').textContent = colly;
+            document.getElementById('totalWeight').textContent = weight;
+        }
+
+        function clearTable() {
+            if (confirm('Reset semua data?')) {
+                document.getElementById('tableBody').innerHTML = '';
+                rowCounter = 0;
+                calculateTotal();
+            }
+        }
+
+        function exportToExcel() {
+            const wb = XLSX.utils.book_new();
+            const data = [["PICK UP ORDER SHEET"]];
+            data.push(["NAMA", document.getElementById('nama').value]);
+            data.push(["AREA", document.getElementById('area').value]);
+            data.push(["NO.HP", document.getElementById('nohp').value]);
+            data.push(["DATE/HARI", document.getElementById('date').value]);
+            data.push(["PLAT NO.", document.getElementById('plat').value]);
+            data.push([]);
+            data.push(["NO","SHIPPER","AWB","COLLY","WEIGHT","REMARKS","SIGNATURE"]);
+
+            document.querySelectorAll('#tableBody tr').forEach(r => {
+                data.push(Array.from(r.cells).map(cell => {
+                    const inp = cell.querySelector('input, textarea');
+                    return inp ? inp.value : cell.textContent;
+                }));
+            });
+
+            data.push(["SUB TOTAL", "", 
+                document.getElementById('totalAwb').textContent,
+                document.getElementById('totalColly').textContent,
+                document.getElementById('totalWeight').textContent, "", ""]);
+
+            const ws = XLSX.utils.aoa_to_sheet(data);
+            XLSX.utils.book_append_sheet(wb, ws, "PickUp");
+            XLSX.writeFile(wb, `Pick_Up_Order_${new Date().toISOString().slice(0,10)}.xlsx`);
+        }
+
+        // PDF PORTRAIT
+        function exportToPDF() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF({ 
+                orientation: 'portrait',   // Diubah ke Portrait
+                unit: 'pt', 
+                format: 'a4' 
+            });
+
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(20);
+            doc.text("PICK UP ORDER SHEET", 297, 40, { align: "center" });
+
+            doc.setFontSize(11);
+            doc.text(`NAMA     : ${document.getElementById('nama').value}`, 40, 80);
+            doc.text(`AREA     : ${document.getElementById('area').value}`, 40, 100);
+            doc.text(`NO.HP    : ${document.getElementById('nohp').value}`, 40, 120);
+            doc.text(`DATE     : ${document.getElementById('date').value}`, 40, 140);
+            doc.text(`PLAT NO. : ${document.getElementById('plat').value}`, 40, 160);
+
+            const tableData = [];
+            document.querySelectorAll('#tableBody tr').forEach(row => {
+                const cells = row.querySelectorAll('td');
+                tableData.push([
+                    cells[0].textContent,
+                    cells[1].querySelector('input').value,
+                    cells[2].querySelector('input').value,
+                    cells[3].querySelector('input').value,
+                    cells[4].querySelector('input').value,
+                    cells[5].querySelector('input').value,
+                    cells[6].querySelector('textarea').value || ''
+                ]);
+            });
+
+            doc.autoTable({
+                head: [['NO', 'SHIPPER', 'AWB', 'COLLY', 'WEIGHT', 'REMARKS', 'SIGNATURE']],
+                body: tableData,
+                startY: 190,
+                styles: { fontSize: 9, fontStyle: 'bold' },
+                headStyles: { fillColor: [30,30,30] },
+                columnStyles: {
+                    0: { cellWidth: 30 },
+                    1: { cellWidth: 90 },
+                    2: { cellWidth: 50 },
+                    3: { cellWidth: 50 },
+                    4: { cellWidth: 50 },
+                    5: { cellWidth: 80 },
+                    6: { cellWidth: 70 }
+                }
+            });
+
+            doc.save(`Pick_Up_Order_${new Date().toISOString().slice(0,10)}.pdf`);
+        }
+
+        window.onload = () => {
+            for (let i = 0; i < 3; i++) addRow({});
+        };
+    </script>
+</body>
+</html>
